@@ -223,13 +223,20 @@ def verify_installation() -> None:
 
 
 def register_magic() -> None:
-    """Load colab_magic.py and register ``%%manimgl``."""
+    """Register ManimGL rendering, download, and file-management shortcuts."""
     magic_file = THIS_DIR / "colab_magic.py"
+    file_tools_file = THIS_DIR / "file_tools.py"
+
     if not magic_file.exists():
         raise FileNotFoundError(f"Magic module not found: {magic_file}")
+    if not file_tools_file.exists():
+        raise FileNotFoundError(f"File tools module not found: {file_tools_file}")
 
-    namespace = runpy.run_path(str(magic_file))
-    namespace["register_manimgl_magic"]()
+    magic_namespace = runpy.run_path(str(magic_file))
+    magic_namespace["register_manimgl_magic"]()
+
+    file_tools_namespace = runpy.run_path(str(file_tools_file))
+    file_tools_namespace["register_file_magics"]()
 
 
 def setup_all(*, register_magic: bool = True, force: bool = False) -> None:
