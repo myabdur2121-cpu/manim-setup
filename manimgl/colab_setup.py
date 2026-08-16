@@ -67,6 +67,51 @@ def install_system_dependencies() -> None:
     ])
 
 
+def install_latex() -> None:
+    """Optionally install TeX Live and dvisvgm for Tex/TexText objects."""
+    print("\nInstalling optional LaTeX dependencies...", flush=True)
+
+    packages = [
+        "texlive-latex-base",
+        "texlive-latex-recommended",
+        "texlive-latex-extra",
+        "texlive-fonts-recommended",
+        "texlive-fonts-extra",
+        "texlive-science",
+        "dvisvgm",
+        "cm-super",
+    ]
+
+    _run(["apt-get", "update", "-qq"])
+    _run([
+        "apt-get",
+        "install",
+        "-y",
+        *packages,
+    ])
+
+    # ManimGL's default TeX template may require tipa.sty.
+    tipa_available = subprocess.run(
+        ["apt-cache", "show", "tipa"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    ).returncode == 0
+
+    if tipa_available:
+        _run(["apt-get", "install", "-y", "tipa"])
+    else:
+        print(
+            "The separate tipa package is unavailable. "
+            "The TeX installation may already provide tipa.sty."
+        )
+
+    _run(["mktexlsr"])
+    _run(["latex", "--version"])
+    _run(["dvisvgm", "--version"])
+    print("LaTeX installation completed successfully.", flush=True)
+
+
 def create_virtual_environment(*, force: bool = False) -> None:
     """Create an isolated environment without invoking broken ensurepip."""
     print("\n[2/7] Creating the isolated Python environment...", flush=True)
