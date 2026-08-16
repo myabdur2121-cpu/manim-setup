@@ -130,6 +130,47 @@ Example:
 
 `--display-width` changes only the notebook preview size. It preserves the aspect ratio and does not alter the MP4 resolution.
 
+## File viewer and editor shortcuts
+
+Open any runtime text file in Colab's editable panel and show a colorful, line-numbered preview:
+
+```python
+%openfile /content/manimGL/manimlib/scene/scene.py
+```
+
+Open with a target line:
+
+```python
+%openfile /content/manimGL/manimlib/scene/scene.py:114
+```
+
+A copied Python traceback header is accepted directly:
+
+```python
+%openfile File "/content/manimGL/manimlib/scene/scene.py", line 114, in run
+```
+
+Paths containing spaces can be quoted:
+
+```python
+%openfile "/content/drive/My Drive/project/file.py" 20
+```
+
+Change the number of surrounding preview lines:
+
+```python
+%openfile --context 20 /content/manimGL/manimlib/scene/scene.py:114
+```
+
+A timestamped backup is created automatically before the editable panel opens. List and restore backups with:
+
+```python
+%filebackups /content/manimGL/manimlib/scene/scene.py
+%restorefile /content/manimGL/manimlib/scene/scene.py
+```
+
+The newest backup is restored, while the current version is backed up first.
+
 ## Download shortcuts
 
 Download the most recently rendered video without remembering its filename:
