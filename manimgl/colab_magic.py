@@ -24,6 +24,9 @@ def register_manimgl_magic() -> None:
     if ipython is None:
         raise RuntimeError("This function must be run inside Google Colab or IPython.")
 
+    # Remember the most recent successful render in this Colab runtime.
+    last_rendered_video: Path | None = None
+
     def manimgl_magic(line: str, cell: str) -> None:
         """Render a ManimGL scene and automatically display its MP4.
 
@@ -33,6 +36,8 @@ def register_manimgl_magic() -> None:
             %%manimgl -qm --prerun MyScene
             %%manimgl -ql --progress MyScene
         """
+        nonlocal last_rendered_video
+
         total_start = time.perf_counter()
         tokens = shlex.split(line)
 
@@ -181,6 +186,7 @@ def register_manimgl_magic() -> None:
                 raise FileNotFoundError("Rendering completed, but no MP4 file was found.")
             expected_video = videos[0]
 
+        last_rendered_video = expected_video
         video_size_mb = expected_video.stat().st_size / (1024 * 1024)
         video_attributes = (
             "controls autoplay muted loop "
@@ -205,17 +211,69 @@ def register_manimgl_magic() -> None:
         print(f"Render process: {process_seconds:.2f} seconds")
         print(f"Preview preparation: {preview_prepare_seconds:.2f} seconds")
         print(f"Total magic time: {total_seconds:.2f} seconds")
+        print(f"Download: %manimgl_download {scene_name}")
+
+    def manimgl_download_magic(line: str) -> None:
+        """Download the latest render, optionally selected by scene class name."""
+        from google.colab import files
+
+        scene_name = line.strip()
+        selected_video: Path | None = None
+
+        if scene_name:
+            # Match both a normal render (Scene.mp4) and partial renders such
+            # as Scene_20_30.mp4. Select the newest matching file.
+            candidates = list(
+                MANIMGL_VIDEO_DIRECTORY.glob(f"{scene_name}*.mp4")
+            )
+            candidates.sort(
+                key=lambda path: path.stat().st_mtime,
+                reverse=True,
+            )
+            if candidates:
+                selected_video = candidates[0]
+        elif last_rendered_video is not None and last_rendered_video.exists():
+            selected_video = last_rendered_video
+        else:
+            # If the magic was re-registered, recover the newest video from disk.
+            candidates = list(MANIMGL_VIDEO_DIRECTORY.glob("*.mp4"))
+            candidates.sort(
+                key=lambda path: path.stat().st_mtime,
+                reverse=True,
+            )
+            if candidates:
+                selected_video = candidates[0]
+
+        if selected_video is None or not selected_video.exists():
+            if scene_name:
+                raise FileNotFoundError(
+                    f"No rendered MP4 was found for scene '{scene_name}'."
+                )
+            raise FileNotFoundError(
+                "No rendered MP4 was found. Render a scene first."
+            )
+
+        size_mb = selected_video.stat().st_size / (1024 * 1024)
+        print(f"Downloading: {selected_video.name} ({size_mb:.2f} MB)")
+        files.download(str(selected_video))
 
     ipython.register_magic_function(
         manimgl_magic,
         magic_kind="cell",
         magic_name="manimgl",
     )
+    ipython.register_magic_function(
+        manimgl_download_magic,
+        magic_kind="line",
+        magic_name="manimgl_download",
+    )
 
     print("Fast %%manimgl registered successfully.")
     print("Draft:    %%manimgl --draft SceneName")
     print("Standard: %%manimgl -ql --display-width 560 SceneName")
     print("Optional: add --prerun and/or --progress when needed")
+    print("Download latest: %manimgl_download")
+    print("Download scene:  %manimgl_download SceneName")
 
 
 if __name__ == "__main__":
