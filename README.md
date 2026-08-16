@@ -106,6 +106,22 @@ Example:
 
 `--display-width` changes only the notebook preview size. It preserves the aspect ratio and does not alter the MP4 resolution.
 
+## Download shortcuts
+
+Download the most recently rendered video without remembering its filename:
+
+```python
+%manimgl_download
+```
+
+Download the newest video belonging to a specific scene class:
+
+```python
+%manimgl_download MyScene
+```
+
+This also finds partial-render filenames such as `MyScene_20_30.mp4`, so only the class name is required.
+
 ## Fonts without LaTeX
 
 ```python
