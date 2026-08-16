@@ -63,10 +63,35 @@ class RotatingSphere(ThreeDScene):
 
 The MP4 is saved under `/content/manimgl_videos/` and displayed automatically.
 
+## Fast rendering modes
+
+The default command starts rendering without prerun or progress overhead:
+
+```python
+%%manimgl -v WARNING -ql --display-width 560 MyScene
+```
+
+For the fastest layout and timing check, use draft mode (640×360 at 15 FPS):
+
+```python
+%%manimgl --draft MyScene
+```
+
+Optional validation and progress flags:
+
+```python
+%%manimgl -ql --prerun MyScene
+%%manimgl -ql --progress MyScene
+%%manimgl -ql --prerun --progress MyScene
+```
+
+Progress output is terminal-dependent and may not render correctly in Google Colab. It is disabled by default.
+
 ## Quality flags
 
 | Colab command | ManimGL output |
 |---|---|
+| `--draft` | Fast preview, 640×360 at 15 FPS |
 | `-ql` | Low quality, 480p |
 | `-qm` | Medium quality, 720p |
 | `-qh` | High quality, 1080p |
