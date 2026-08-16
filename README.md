@@ -87,6 +87,30 @@ Optional validation and progress flags:
 
 Progress output is terminal-dependent and may not render correctly in Google Colab. It is disabled by default.
 
+## Enhanced error reports
+
+The default compact mode highlights the most relevant line in your scene and ends with the exception name and message:
+
+```python
+%%manimgl --draft MyScene
+```
+
+For a complete ManimGL backend traceback, add `--ERROR` (case-insensitive):
+
+```python
+%%manimgl --draft --ERROR MyScene
+```
+
+The following are equivalent:
+
+```text
+--error
+--ERROR
+--Error
+```
+
+Full mode shows user and backend frames, source context, highlighted lines, exception chains, and expandable raw ManimGL/LaTeX/FFmpeg output.
+
 ## Quality flags
 
 | Colab command | ManimGL output |
