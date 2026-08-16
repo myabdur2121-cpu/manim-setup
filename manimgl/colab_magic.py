@@ -1,10 +1,13 @@
-"""Google Colab cell magic for headless ManimGL rendering."""
+"""Google Colab cell magic for headless ManimGL rendering with live output."""
 
 from __future__ import annotations
 
 import os
+import pty
+import select
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -14,8 +17,65 @@ MANIMGL_VIDEO_DIRECTORY = Path("/content/manimgl_videos")
 MANIMGL_RUNTIME_DIRECTORY = Path("/tmp/runtime-colab")
 
 
+def run_with_live_terminal(command: list[str], environment: dict[str, str]) -> int:
+    """Run ManimGL in a pseudo-terminal and stream its output into Colab."""
+    master_fd, slave_fd = pty.openpty()
+
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=slave_fd,
+        stderr=slave_fd,
+        env=environment,
+        close_fds=True,
+    )
+    os.close(slave_fd)
+
+    try:
+        while True:
+            readable, _, _ = select.select([master_fd], [], [], 0.1)
+
+            if readable:
+                try:
+                    output = os.read(master_fd, 8192)
+                except OSError:
+                    break
+
+                if not output:
+                    break
+
+                sys.stdout.write(output.decode("utf-8", errors="replace"))
+                sys.stdout.flush()
+
+            if process.poll() is not None:
+                # Drain any output left after the process exits.
+                while True:
+                    readable, _, _ = select.select([master_fd], [], [], 0)
+                    if not readable:
+                        break
+
+                    try:
+                        output = os.read(master_fd, 8192)
+                    except OSError:
+                        break
+
+                    if not output:
+                        break
+
+                    sys.stdout.write(output.decode("utf-8", errors="replace"))
+                    sys.stdout.flush()
+                break
+    finally:
+        try:
+            os.close(master_fd)
+        except OSError:
+            pass
+
+    return process.wait()
+
+
 def register_manimgl_magic() -> None:
-    """Register ``%%manimgl`` in the active IPython/Colab notebook."""
+    """Register ``%%manimgl`` in the active Google Colab notebook."""
     from IPython import get_ipython
     from IPython.display import Video, display
 
@@ -24,20 +84,21 @@ def register_manimgl_magic() -> None:
         raise RuntimeError("This function must be run inside Google Colab or IPython.")
 
     def manimgl_magic(line: str, cell: str) -> None:
-        """Render a ManimGL scene and display the resulting MP4."""
+        """Render a ManimGL scene and automatically display its MP4."""
         tokens = shlex.split(line)
+
         if not tokens:
             raise ValueError(
-                "A scene class name is required. Example: "
-                "%%manimgl -v WARNING -ql MyScene"
+                "Scene name পাওয়া যায়নি।\n"
+                "Example: %%manimgl -v INFO -ql MyScene"
             )
 
-        # Convention: the scene class name is the final argument.
+        # The final argument is the scene class name.
         scene_name = tokens[-1]
         options = tokens[:-1]
 
         quality = "-l"
-        log_level = "WARNING"
+        log_level = "INFO"
         display_width = 560
         extra_options: list[str] = []
 
@@ -55,18 +116,25 @@ def register_manimgl_magic() -> None:
                 quality = "--uhd"
             elif option in ("-v", "--verbosity"):
                 if index + 1 >= len(options):
-                    raise ValueError("-v must be followed by DEBUG, INFO, WARNING, ERROR, or CRITICAL.")
+                    raise ValueError(
+                        "-v এর পরে log level দিতে হবে।\n"
+                        "Example: -v INFO"
+                    )
                 log_level = options[index + 1].upper()
                 index += 1
             elif option == "--display-width":
                 if index + 1 >= len(options):
-                    raise ValueError("--display-width must be followed by a pixel width.")
+                    raise ValueError(
+                        "--display-width এর পরে pixel width দিতে হবে।"
+                    )
                 try:
                     display_width = int(options[index + 1])
                 except ValueError as error:
-                    raise ValueError("Display width must be an integer, such as 560.") from error
+                    raise ValueError(
+                        "Display width অবশ্যই integer হতে হবে, যেমন 560।"
+                    ) from error
                 if display_width < 100:
-                    raise ValueError("Display width must be at least 100 pixels.")
+                    raise ValueError("Display width কমপক্ষে 100 pixels হতে হবে।")
                 index += 1
             else:
                 extra_options.append(option)
@@ -92,6 +160,7 @@ def register_manimgl_magic() -> None:
         environment["XDG_RUNTIME_DIR"] = str(MANIMGL_RUNTIME_DIRECTORY)
         environment["LIBGL_ALWAYS_SOFTWARE"] = "1"
         environment["PYTHONUNBUFFERED"] = "1"
+        environment["TERM"] = "xterm-256color"
 
         command = [
             str(MANIMGL_EXECUTABLE),
@@ -105,23 +174,28 @@ def register_manimgl_magic() -> None:
             str(MANIMGL_VIDEO_DIRECTORY),
             "--log-level",
             log_level,
+            "--show_animation_progress",
+            "--leave_progress_bars",
+            "--prerun",
             *extra_options,
         ]
 
         print("=" * 65)
-        print("ManimGL rendering started")
+        print("ManimGL rendering শুরু হচ্ছে")
         print("=" * 65)
         print(f"Scene: {scene_name}")
         print(f"Quality: {quality}")
         print(f"Log level: {log_level}")
         print(f"Preview width: {display_width}px")
-        print("\nCommand:")
-        print(" ".join(shlex.quote(part) for part in command))
+        print("\nপ্রথমে ManimGL মোট frame গণনা করবে।")
+        print("তারপর actual rendering progress দেখাবে।")
         print("=" * 65, flush=True)
 
-        result = subprocess.run(command, env=environment, check=False)
-        if result.returncode != 0:
-            raise RuntimeError(f"ManimGL rendering failed with exit code {result.returncode}.")
+        return_code = run_with_live_terminal(command, environment)
+        if return_code != 0:
+            raise RuntimeError(
+                f"ManimGL rendering failed. Exit code: {return_code}"
+            )
 
         if not expected_video.exists():
             videos = sorted(
@@ -130,7 +204,9 @@ def register_manimgl_magic() -> None:
                 reverse=True,
             )
             if not videos:
-                raise FileNotFoundError("Rendering completed, but no MP4 file was found.")
+                raise FileNotFoundError(
+                    "Rendering শেষ হয়েছে, কিন্তু MP4 পাওয়া যায়নি।"
+                )
             expected_video = videos[0]
 
         video_size_mb = expected_video.stat().st_size / (1024 * 1024)
@@ -140,19 +216,26 @@ def register_manimgl_magic() -> None:
         print(f"Video: {expected_video}")
         print(f"File size: {video_size_mb:.2f} MB")
 
-        attributes = (
+        video_attributes = (
             "controls autoplay muted loop "
-            f'width="{display_width}" style="max-width:100%; height:auto;"'
+            f'style="width:{display_width}px; max-width:100%; height:auto;"'
         )
-        display(Video(str(expected_video), embed=True, html_attributes=attributes))
+        display(
+            Video(
+                str(expected_video),
+                embed=True,
+                html_attributes=video_attributes,
+            )
+        )
 
     ipython.register_magic_function(
         manimgl_magic,
         magic_kind="cell",
         magic_name="manimgl",
     )
-    print("%%manimgl registered successfully.")
-    print("Example: %%manimgl -v WARNING -ql --display-width 560 SceneName")
+
+    print("Live-progress %%manimgl command registered successfully.")
+    print("Example: %%manimgl -v INFO -ql --display-width 560 SceneName")
 
 
 if __name__ == "__main__":
