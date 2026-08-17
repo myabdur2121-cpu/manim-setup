@@ -222,6 +222,50 @@ Clean reinstall:
 setup_all(register_magic=True, force=True)
 ```
 
+## Optional NVIDIA GPU acceleration
+
+Select a Colab GPU runtime first:
+
+```text
+Runtime → Change runtime type → T4 GPU (or another NVIDIA GPU)
+```
+
+After the normal setup, run:
+
+```python
+setup_gpu()
+```
+
+The GPU setup safely downloads userspace libraries matching the active NVIDIA kernel driver and extracts them under `/content`; it does not replace Colab's system NVIDIA driver. It creates a second isolated environment pinned to the official ModernGL-based ManimGL release, configures headless NVIDIA EGL, patches the legacy FPS parser, verifies OpenGL 4.3+, and registers:
+
+```python
+%%manimgl_gpu --draft SceneName
+```
+
+Example:
+
+```python
+%%manimgl_gpu --draft RotatingSphere
+from manimlib import *
+
+
+class RotatingSphere(ThreeDScene):
+    def construct(self):
+        self.frame.reorient(25, 70)
+        sphere = Sphere(radius=2.2, resolution=(25, 25))
+        self.play(FadeIn(sphere))
+        self.play(Rotate(sphere, TAU, axis=UP), run_time=4, rate_func=linear)
+        self.wait()
+```
+
+GPU information:
+
+```python
+%manimgl_gpuinfo
+```
+
+The regular `%%manimgl` command remains available as the reliable software/WGPU engine. GPU mode requires an NVIDIA Colab runtime and exact matching NVIDIA userspace packages in the configured APT repositories.
+
 ## Colab persistence
 
-A completely new or deleted Colab runtime loses `/content` and system packages. Run Cell 1 and Cell 2 again for every new runtime. Videos you want to keep should be downloaded or copied to Google Drive.
+A completely new or deleted Colab runtime loses `/content` and system packages. Run Cell 1 and Cell 2 again for every new runtime. GPU users must also rerun `setup_gpu()`. Videos you want to keep should be downloaded or copied to Google Drive.
