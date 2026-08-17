@@ -239,6 +239,15 @@ def register_magic() -> None:
     file_tools_namespace["register_file_magics"]()
 
 
+def setup_gpu(*, register_magic: bool = True, force: bool = False) -> None:
+    """Install and configure the optional NVIDIA EGL/ModernGL GPU engine."""
+    gpu_tools_file = THIS_DIR / "gpu_tools.py"
+    if not gpu_tools_file.exists():
+        raise FileNotFoundError(f"GPU tools module not found: {gpu_tools_file}")
+    namespace = runpy.run_path(str(gpu_tools_file))
+    namespace["setup_gpu"](register_magic=register_magic, force=force)
+
+
 def setup_all(*, register_magic: bool = True, force: bool = False) -> None:
     """Run the complete safe Colab installation.
 
