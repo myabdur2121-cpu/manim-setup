@@ -20,13 +20,14 @@ Start with a CPU runtime. Run these cells in order and do not restart after setu
 
 ```bash
 !rm -rf /content/manim-setup
+
 !git clone --depth 1 \
     https://github.com/myabdur2121-cpu/manim-setup.git \
     /content/manim-setup
 
 !python -m pip install \
     --no-deps \
-    -e /content/manim-setup
+    /content/manim-setup
 ```
 
 `--no-deps` is important: it installs only this lightweight setup API and never upgrades Colab's IPython or installs ManimGL into the notebook kernel.
