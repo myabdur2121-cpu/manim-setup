@@ -236,7 +236,15 @@ After the normal setup, run:
 setup_gpu()
 ```
 
-The GPU setup safely downloads userspace libraries matching the active NVIDIA kernel driver and extracts them under `/content`; it does not replace Colab's system NVIDIA driver. It creates a second isolated environment pinned to the official ModernGL-based ManimGL release, configures headless NVIDIA EGL, patches the legacy FPS parser, verifies OpenGL 4.3+, and registers:
+The GPU setup safely downloads userspace libraries matching the active NVIDIA kernel driver and extracts them under `/content`; it does not replace Colab's system NVIDIA driver. It creates a second isolated environment pinned to the official ModernGL-based ManimGL release, configures headless NVIDIA EGL, patches the legacy FPS parser, verifies OpenGL 4.3+, and automatically enables a Colab editor bridge. The bridge resolves `from manimlib import *`, removes false missing-import/undefined-name underlines, and loads ManimGL symbols for IDE autocomplete and hints without replacing Colab's IPython.
+
+To refresh the editor bridge manually:
+
+```python
+enable_manim_autocomplete()
+```
+
+GPU setup registers:
 
 ```python
 %%manimgl_gpu --draft SceneName
