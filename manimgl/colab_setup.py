@@ -239,13 +239,31 @@ def register_magic() -> None:
     file_tools_namespace["register_file_magics"]()
 
 
-def setup_gpu(*, register_magic: bool = True, force: bool = False) -> None:
+def setup_gpu(
+    *,
+    register_magic: bool = True,
+    enable_autocomplete: bool = True,
+    force: bool = False,
+) -> None:
     """Install and configure the optional NVIDIA EGL/ModernGL GPU engine."""
     gpu_tools_file = THIS_DIR / "gpu_tools.py"
     if not gpu_tools_file.exists():
         raise FileNotFoundError(f"GPU tools module not found: {gpu_tools_file}")
     namespace = runpy.run_path(str(gpu_tools_file))
-    namespace["setup_gpu"](register_magic=register_magic, force=force)
+    namespace["setup_gpu"](
+        register_magic=register_magic,
+        enable_autocomplete=enable_autocomplete,
+        force=force,
+    )
+
+
+def enable_manim_autocomplete() -> dict[str, object]:
+    """Enable or refresh ManimGL IDE resolution and runtime completions."""
+    gpu_tools_file = THIS_DIR / "gpu_tools.py"
+    if not gpu_tools_file.exists():
+        raise FileNotFoundError(f"GPU tools module not found: {gpu_tools_file}")
+    namespace = runpy.run_path(str(gpu_tools_file))
+    return namespace["enable_manim_autocomplete"]()
 
 
 def setup_all(*, register_magic: bool = True, force: bool = False) -> None:
