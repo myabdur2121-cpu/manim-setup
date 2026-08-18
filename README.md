@@ -16,21 +16,36 @@ A safe, repeatable ManimGL v1.7.x setup for a fresh Google Colab runtime.
 
 Start with a CPU runtime. Run these cells in order and do not restart after setup.
 
-### Cell 1 — Clone this repository
+### Cell 1 — Clone and install the lightweight setup API
 
 ```bash
 !rm -rf /content/manim-setup
 !git clone --depth 1 \
     https://github.com/myabdur2121-cpu/manim-setup.git \
     /content/manim-setup
+
+!python -m pip install \
+    --no-deps \
+    -e /content/manim-setup
 ```
 
-### Cell 2 — Install and register `%%manimgl`
+`--no-deps` is important: it installs only this lightweight setup API and never upgrades Colab's IPython or installs ManimGL into the notebook kernel.
+
+### Cell 2 — Import, install, and register `%%manimgl`
 
 ```python
-%run /content/manim-setup/manimgl/colab_setup.py
+from manim_setup import setup_all, setup_gpu
+
 setup_all(register_magic=True)
 ```
+
+For an NVIDIA GPU runtime, also run:
+
+```python
+setup_gpu(register_magic=True)
+```
+
+Because these are real package imports, Colab's IDE resolves `setup_all()` and `setup_gpu()` without false undefined-name underlines and provides signatures and autocomplete.
 
 ### Cell 3 — Render
 
@@ -198,6 +213,27 @@ Text("বাংলা ভাষা", font="Noto Serif Bengali")
 Use `Text`, not `Tex` or `MathTex`, until LaTeX is installed separately.
 
 ## Functions available for manual setup
+
+Import the public API explicitly for full IDE resolution:
+
+```python
+from manim_setup import (
+    create_virtual_environment,
+    download_manimgl,
+    enable_manim_autocomplete,
+    install_latex,
+    install_manimgl,
+    install_pip,
+    install_system_dependencies,
+    prepare_directories,
+    register_magic,
+    setup_all,
+    setup_gpu,
+    verify_installation,
+)
+```
+
+The available functions include:
 
 ```python
 install_system_dependencies()
