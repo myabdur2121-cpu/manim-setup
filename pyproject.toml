@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "manim-colab-setup"
+version = "0.1.0"
+description = "Safe CPU and NVIDIA GPU ManimGL setup helpers for Google Colab"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+  {name = "myabdur2121-cpu"}
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["manim_setup*", "manimgl*"]
+exclude = ["manimgl.examples*"]
+
+[tool.setuptools.package-data]
+manim_setup = ["py.typed"]
+manimgl = ["py.typed"]
