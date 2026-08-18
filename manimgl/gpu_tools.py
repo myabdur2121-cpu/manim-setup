@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
 import json
 import os
-import re
 import runpy
 import shutil
+import site
 import subprocess
 import sys
 import urllib.request
+import warnings
 from pathlib import Path
 
 
@@ -304,12 +307,117 @@ ctx.release()
     return info
 
 
+def enable_manim_autocomplete() -> dict[str, object]:
+    """Expose the real GPU ManimGL source to Colab's IDE and autocomplete.
+
+    The GPU environment remains isolated for rendering. A symlink and a .pth
+    dependency bridge let Colab's language server resolve ``manimlib`` without
+    upgrading or replacing Colab's own IPython installation.
+    """
+    if not GPU_PYTHON.exists() or not (GPU_SOURCE / "manimlib").exists():
+        raise FileNotFoundError("GPU ManimGL is not installed. Run setup_gpu() first.")
+
+    colab_site = Path(site.getsitepackages()[0])
+    gpu_site_output = subprocess.check_output(
+        [
+            str(GPU_PYTHON),
+            "-c",
+            "import site; print(site.getsitepackages()[0])",
+        ],
+        text=True,
+    ).strip()
+    gpu_site = Path(gpu_site_output)
+    gpu_manimlib = (GPU_SOURCE / "manimlib").resolve()
+
+    pth_file = colab_site / "manimgl_gpu_autocomplete.pth"
+    pth_file.write_text(str(gpu_site) + "\n", encoding="utf-8")
+
+    manimlib_link = colab_site / "manimlib"
+    if manimlib_link.is_symlink():
+        if manimlib_link.resolve() != gpu_manimlib:
+            manimlib_link.unlink()
+            manimlib_link.symlink_to(gpu_manimlib, target_is_directory=True)
+    elif manimlib_link.exists():
+        # A real base-kernel package must never be deleted automatically.
+        if manimlib_link.resolve() != gpu_manimlib:
+            raise RuntimeError(
+                "A different real manimlib package already exists in Colab's "
+                f"site-packages: {manimlib_link}"
+            )
+    else:
+        manimlib_link.symlink_to(gpu_manimlib, target_is_directory=True)
+
+    for path in (str(gpu_site), str(GPU_SOURCE)):
+        if path not in sys.path:
+            sys.path.append(path)
+    importlib.invalidate_caches()
+
+    os.environ["PYGLET_HEADLESS"] = "true"
+    os.environ["PYOPENGL_PLATFORM"] = "egl"
+    warnings.filterwarnings(
+        "ignore",
+        message=r"pkg_resources is deprecated.*",
+        category=UserWarning,
+    )
+
+    import pyglet
+
+    pyglet.options["headless"] = True
+    pyglet.options["headless_device"] = 0
+    pyglet.options["shadow_window"] = False
+
+    existing = sys.modules.get("manimlib")
+    if existing is not None:
+        existing_file = str(getattr(existing, "__file__", ""))
+        if not existing_file.startswith(str(GPU_SOURCE)):
+            for module_name in list(sys.modules):
+                if module_name == "manimlib" or module_name.startswith("manimlib."):
+                    sys.modules.pop(module_name, None)
+
+    manimlib = importlib.import_module("manimlib")
+    public_symbols = {
+        name: getattr(manimlib, name)
+        for name in dir(manimlib)
+        if not name.startswith("_")
+    }
+
+    try:
+        from IPython import get_ipython
+
+        ipython = get_ipython()
+        if ipython is not None:
+            ipython.user_ns.update(public_symbols)
+    except ImportError:
+        pass
+
+    specification = importlib.util.find_spec("manimlib")
+    result: dict[str, object] = {
+        "module": str(getattr(manimlib, "__file__", "")),
+        "resolved": str(specification.origin if specification else ""),
+        "symbols": len(public_symbols),
+        "pth_file": str(pth_file),
+        "package_link": str(manimlib_link),
+    }
+
+    print("\nManimGL editor bridge enabled successfully.")
+    print(f"Resolved module: {result['resolved']}")
+    print(f"Autocomplete symbols: {result['symbols']}")
+    print("IDE hints: enabled")
+    print("Missing-import underlines: resolved")
+    return result
+
+
 def register_gpu_magic() -> None:
     namespace = runpy.run_path(str(THIS_DIR / "gpu_magic.py"))
     namespace["register_manimgl_gpu_magic"]()
 
 
-def setup_gpu(*, register_magic: bool = True, force: bool = False) -> None:
+def setup_gpu(
+    *,
+    register_magic: bool = True,
+    enable_autocomplete: bool = True,
+    force: bool = False,
+) -> None:
     """Perform the complete safe Colab NVIDIA GPU setup."""
     print("=" * 72)
     print("ManimGL NVIDIA GPU setup (EGL + ModernGL)")
@@ -339,6 +447,9 @@ def setup_gpu(*, register_magic: bool = True, force: bool = False) -> None:
     config["gpu_source"] = str(GPU_SOURCE)
     config["runner"] = str(THIS_DIR / "moderngl_gpu_runner.py")
     GPU_CONFIG.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+    if enable_autocomplete:
+        enable_manim_autocomplete()
 
     if register_magic:
         register_gpu_magic()
